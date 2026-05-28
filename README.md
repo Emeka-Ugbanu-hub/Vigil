@@ -2,7 +2,7 @@
 
 A calm, local-first menu bar app for GitHub maintainers. Runs in your menu bar. Surfaces only what needs your attention — no noise, no overload.
 
-[🌐 Landing page](https://Emeka-Ugbanu-hub.github.io/Vigil)
+[🌐 Landing page](https://emeka-ugbanu-hub.github.io/Vigil)
 
 ---
 
