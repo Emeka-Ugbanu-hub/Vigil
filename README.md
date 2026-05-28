@@ -2,7 +2,7 @@
 
 A calm, local-first menu bar app for GitHub maintainers. Runs in your menu bar. Surfaces only what needs your attention — no noise, no overload.
 
-[🌐 Landing page](https://Emeka-Ugbanu-hub.github.io/vigil)
+[🌐 Landing page](https://Emeka-Ugbanu-hub.github.io/Vigil)
 
 ---
 
@@ -67,8 +67,8 @@ It polls every 30s–5min (adaptive), uses ETags to minimize API calls, and neve
 # Prerequisites
 # Node.js 18+, Rust 1.77+
 
-git clone https://github.com/emekaugbanu-hub/vigil.git
-cd vigil
+git clone https://github.com/Emeka-Ugbanu-hub/Vigil.git
+cd Vigil
 npm install
 npm run tauri dev
 ```
