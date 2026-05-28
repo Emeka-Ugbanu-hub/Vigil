@@ -113,9 +113,9 @@ fn toggle_popover<R: Runtime>(app: &AppHandle<R>, cursor_pos: Option<(f64, f64)>
                 }
             }
 
-            configure_popover(&window);
             crate::activate::activate_app(app);
             let _ = window.show();
+            configure_popover(&window);
             let _ = window.set_focus();
     }
 }
@@ -155,6 +155,23 @@ fn configure_popover<R: Runtime>(window: &WebviewWindow<R>) {
     #[cfg(target_os = "macos")]
     if let Ok(ns_window) = window.ns_window() {
         crate::activate::configure_overlay_window(ns_window);
+    }
+}
+
+pub fn prewarm_popover<R: Runtime>(app: &AppHandle<R>) {
+    if app.get_webview_window("popover").is_some() { return; }
+    if let Ok(window) = WebviewWindowBuilder::new(app, "popover", WebviewUrl::App("index.html".into()))
+        .title("")
+        .inner_size(POPOVER_WIDTH, POPOVER_HEIGHT)
+        .decorations(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .visible(false)
+        .resizable(false)
+        .accept_first_mouse(true)
+        .build()
+    {
+        configure_popover(&window);
     }
 }
 

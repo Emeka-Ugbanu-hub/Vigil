@@ -135,11 +135,15 @@ export const Onboarding: React.FC<Props> = ({ onConnected, compact = false }) =>
               onClick={() => { openUrl(GITHUB_APP_URL); setStep('checklist'); }}
               style={{ ...primaryButtonStyle, fontSize: 13, minHeight: 44 }}
             >
-              Open GitHub → Step 1 of 3
+              Open GitHub
             </button>
-            <div style={{ fontSize: 9, color: ui.textFaint, marginTop: 10 }}>
-              Opens the OAuth App creation page
-            </div>
+            <div style={{ height: 8 }} />
+            <button
+              onClick={() => setStep('paste_id')}
+              style={{ ...secondaryButtonStyle, fontSize: 13, minHeight: 44 }}
+            >
+              I have a Client ID →
+            </button>
           </div>
         )}
 
@@ -159,7 +163,7 @@ export const Onboarding: React.FC<Props> = ({ onConnected, compact = false }) =>
               <FieldRow label="Device Flow" value="Enable (checkbox)" />
             </div>
             <div style={{ paddingTop: 10 }}>
-              <button onClick={() => setStep('paste_id')} style={secondaryButtonStyle}>
+              <button onClick={() => setStep('open_github')} style={secondaryButtonStyle}>
                 ← Back
               </button>
               <div style={{ height: 6 }} />
@@ -200,7 +204,7 @@ export const Onboarding: React.FC<Props> = ({ onConnected, compact = false }) =>
               )}
             </div>
             <div style={{ paddingTop: 10 }}>
-              <button onClick={() => setStep('checklist')} style={secondaryButtonStyle}>
+              <button onClick={() => setStep('open_github')} style={secondaryButtonStyle}>
                 ← Back
               </button>
               <div style={{ height: 6 }} />

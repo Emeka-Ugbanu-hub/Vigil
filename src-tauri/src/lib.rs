@@ -18,6 +18,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.handle()
@@ -36,6 +37,13 @@ pub fn run() {
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 start_polling_loop(handle).await;
+            });
+
+            // Prewarm popover after Vite is ready (fixes first-click delay)
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                tray::prewarm_popover(&handle);
             });
 
             Ok(())
@@ -89,15 +97,17 @@ pub fn run() {
 }
 
 async fn start_polling_loop<R: Runtime>(app: AppHandle<R>) {
-    let mut interval: u64 = 60;
     loop {
         let token = db::get_setting(&app, "github_token");
         if let Some(token) = token {
             if !token.is_empty() {
-                let found_new = smart_poll::<R>(&app, &token).await;
+                let _ = smart_poll::<R>(&app, &token).await;
                 check_notifications::<R>(&app).await;
                 update_badge_from_summary::<R>(&app);
-                interval = if found_new { (interval / 2).max(30) } else { (interval * 2).min(300) };
+                let interval = db::get_setting(&app, "poll_interval_s")
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .unwrap_or(60)
+                    .clamp(30, 300);
                 tokio::time::sleep(std::time::Duration::from_secs(interval)).await;
             } else {
                 tokio::time::sleep(std::time::Duration::from_secs(30)).await;

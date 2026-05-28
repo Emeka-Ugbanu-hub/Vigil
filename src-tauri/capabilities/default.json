@@ -9,6 +9,7 @@
     "process:default",
     "notification:default",
     "notification:allow-notify",
+    "autostart:default",
     "notification:allow-is-permission-granted",
     "notification:allow-request-permission",
     "core:window:allow-show",

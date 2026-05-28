@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { invoke, openUrl } from '../tauri';
 import { TagPills } from './TagPills';
-import { getPriorityColor } from '../engine/scoring';
 import type { Item, Comment as CommentType } from '../engine/types';
 import { HeaderTitle, IconButton, panelStyle, contentStyle, glassPanelStyle, shellStyle, ui } from './design';
 
@@ -77,15 +76,6 @@ export const ItemDetail: React.FC<Props> = ({ itemId, onBack }) => {
       </div>
 
       <div style={{ ...contentStyle, padding: '8px 14px' }}>
-        <div style={{ ...glassPanelStyle, padding: 13, marginBottom: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 7 }}>
-            <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 800 }}>Priority Score</span>
-            <span style={{ color: getPriorityColor(item.priority), fontWeight: 700 }}>{item.score}/100</span>
-          </div>
-          <div style={{ height: 3, borderRadius: 0, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${item.score}%`, background: getPriorityColor(item.priority), borderRadius: 0, transition: 'width 0.4s' }} />
-          </div>
-        </div>
 
         {item.is_first_timer && (
           <div style={{ ...glassPanelStyle, padding: 12, marginBottom: 10 }}>
@@ -107,49 +97,51 @@ export const ItemDetail: React.FC<Props> = ({ itemId, onBack }) => {
 
         <div style={{ borderTop: '1px dashed rgba(255,255,255,0.12)', margin: '6px 0 8px' }} />
 
-        {supportsComments ? (
-          !showComments ? (
-            <button
-              onClick={loadComments}
-              disabled={commentsLoading}
-              style={{
-                width: '100%', minHeight: 34, borderRadius: 0,
-                border: '1px solid rgba(255,255,255,0.12)',
-                background: 'rgba(255,255,255,0.05)',
-                color: 'rgba(255,255,255,0.72)', fontSize: 11, fontWeight: 800,
-                cursor: commentsLoading ? 'not-allowed' : 'pointer',
-                opacity: commentsLoading ? 0.6 : 1,
-              }}
-            >
-              {commentsLoading ? 'Loading...' : `Show comments (${item.comments_count})`}
-            </button>
-          ) : (
-            <>
-              <div style={{ padding: '6px 0 4px', fontSize: 10, fontWeight: 900, color: 'rgba(255,255,255,0.36)' }}>
-                {comments.length} COMMENTS
+        {supportsComments && item.comments_count > 0 && !showComments && (
+          <button
+            onClick={loadComments}
+            disabled={commentsLoading}
+            style={{
+              width: '100%', minHeight: 34, borderRadius: 0,
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.05)',
+              color: 'rgba(255,255,255,0.72)', fontSize: 11, fontWeight: 800,
+              cursor: commentsLoading ? 'not-allowed' : 'pointer',
+              opacity: commentsLoading ? 0.6 : 1,
+            }}
+          >
+            {commentsLoading ? 'Loading...' : 'Show comments'}
+          </button>
+        )}
+
+        {supportsComments && showComments && (
+          <>
+            <div style={{ padding: '6px 0 4px', fontSize: 10, fontWeight: 900, color: 'rgba(255,255,255,0.36)' }}>
+              {comments.length} COMMENTS
+            </div>
+            {comments.map((comment, idx) => (
+              <div key={comment.id} style={{ ...glassPanelStyle, padding: '10px 11px', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  {comment.avatar_url && (
+                    <img src={comment.avatar_url} alt="" style={{ width: 16, height: 16, borderRadius: 0 }} />
+                  )}
+                  <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.72)' }}>@{comment.author}</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{formatTime(comment.created_at)}</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.48)', lineHeight: 1.4, paddingLeft: 22, fontWeight: 700 }}>
+                  {comment.body}
+                </div>
               </div>
-              {comments.map((comment, idx) => (
-                <div key={comment.id} style={{ ...glassPanelStyle, padding: '10px 11px', marginBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    {comment.avatar_url && (
-                      <img src={comment.avatar_url} alt="" style={{ width: 16, height: 16, borderRadius: 0 }} />
-                    )}
-                    <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.72)' }}>@{comment.author}</span>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{formatTime(comment.created_at)}</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.48)', lineHeight: 1.4, paddingLeft: 22, fontWeight: 700 }}>
-                    {comment.body}
-                  </div>
-                </div>
-              ))}
-              {comments.length === 0 && (
-                <div style={{ padding: '10px', fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center', fontWeight: 700 }}>
-                  No comments yet
-                </div>
-              )}
-            </>
-          )
-        ) : (
+            ))}
+            {comments.length === 0 && (
+              <div style={{ padding: '10px', fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center', fontWeight: 700 }}>
+                No comments yet
+              </div>
+            )}
+          </>
+        )}
+
+        {!supportsComments && (
           <div style={{ ...glassPanelStyle, padding: 12, marginBottom: 10 }}>
             <div style={{ fontSize: 10, fontWeight: 900, color: 'rgba(255,255,255,0.36)', marginBottom: 6 }}>
               {item.item_type === 'ci' ? 'WORKFLOW DETAILS' :
@@ -217,6 +209,7 @@ export const ItemDetail: React.FC<Props> = ({ itemId, onBack }) => {
 function formatTime(dateStr: string): string {
   const now = Date.now();
   const date = new Date(dateStr).getTime();
+  if (isNaN(date)) return 'unknown';
   const diffMin = Math.floor((now - date) / 60000);
   if (diffMin < 60) return `${diffMin}m ago`;
   const diffHrs = Math.floor(diffMin / 60);

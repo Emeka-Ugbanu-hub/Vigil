@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { enable as autoEnable, disable as autoDisable, isEnabled as autoIsEnabled } from '@tauri-apps/plugin-autostart';
 import { invoke, openUrl } from '../tauri';
 import { HeaderTitle, IconButton, panelStyle, contentStyle, glassPanelStyle, shellStyle, ui } from './design';
 import { SkeuomorphicSlider } from './SkeuomorphicSlider';
@@ -24,10 +25,26 @@ export const Settings: React.FC<Props> = ({ onBack, onManageRepos }) => {
   const [authError, setAuthError] = useState<string>('');
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState('');
+  const [autoLaunch, setAutoLaunch] = useState(false);
+  const [repos, setRepos] = useState<{ id: string; name: string; enabled: boolean }[]>([]);
+  const authPollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     loadSettings();
+    autoIsEnabled().then(setAutoLaunch).catch(() => {});
+    invoke<{ id: string; name: string; enabled: boolean }[]>('get_repos').then(list => setRepos(list.filter(r => r.enabled))).catch(() => {});
+    return () => {
+      if (authPollTimer.current) {
+        clearInterval(authPollTimer.current);
+        authPollTimer.current = null;
+      }
+    };
   }, []);
+
+  async function disableRepo(id: string) {
+    await invoke('set_repo_enabled', { repoId: id, enabled: false });
+    setRepos(prev => prev.filter(r => r.id !== id));
+  }
 
   async function loadSettings() {
     try {
@@ -49,16 +66,23 @@ export const Settings: React.FC<Props> = ({ onBack, onManageRepos }) => {
 
   async function handleConnect() {
     try {
+      if (authPollTimer.current) {
+        clearInterval(authPollTimer.current);
+        authPollTimer.current = null;
+      }
       setAuthStatus('connecting');
       const flow = await invoke<DeviceFlowInfo>('start_auth');
       setDeviceFlow(flow);
       openUrl(flow.verification_uri);
       setAuthStatus('polling');
-      const timer = setInterval(async () => {
+      authPollTimer.current = setInterval(async () => {
         try {
           const authed = await invoke<boolean>('is_authenticated');
           if (authed) {
-            clearInterval(timer);
+            if (authPollTimer.current) {
+              clearInterval(authPollTimer.current);
+              authPollTimer.current = null;
+            }
             setAuthStatus('connected');
             await loadSettings();
           }
@@ -82,6 +106,16 @@ export const Settings: React.FC<Props> = ({ onBack, onManageRepos }) => {
       return next;
     });
     setAuthStatus('idle');
+  }
+
+  async function handleAutoLaunchToggle() {
+    if (autoLaunch) {
+      await autoDisable();
+      setAutoLaunch(false);
+    } else {
+      await autoEnable();
+      setAutoLaunch(true);
+    }
   }
 
   async function handleForceSync() {
@@ -158,6 +192,37 @@ export const Settings: React.FC<Props> = ({ onBack, onManageRepos }) => {
                   Manage Repos
                 </button>
               </div>
+
+              {/* Connected repos */}
+              {repos.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 10, color: ui.textFaint, fontWeight: 800, marginBottom: 4 }}>
+                    Connected repos
+                  </div>
+                  {repos.map((repo) => {
+                    const shortName = repo.name.split('/').pop() || repo.name;
+                    return (
+                      <div key={repo.id} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '5px 8px', marginBottom: 2,
+                        background: ui.surface, border: `1px solid ${ui.border}`, fontSize: 11,
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                          <div style={{ width: 7, height: 7, borderRadius: 0, background: ui.green, flexShrink: 0 }} />
+                          <span style={{ color: ui.text, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shortName}</span>
+                        </div>
+                        <button onClick={() => disableRepo(repo.id)} style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: '#ff3b30', fontSize: 10, fontWeight: 800, padding: '2px 6px', flexShrink: 0,
+                        }}>
+                          disconnect
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: 6 }}>
                 <button
                   onClick={handleDisconnect}
@@ -269,6 +334,15 @@ export const Settings: React.FC<Props> = ({ onBack, onManageRepos }) => {
               )}
             </div>
           )}
+        </Section>
+
+        {/* Auto-start */}
+        <Section title="Startup">
+          <ToggleRow
+            label="Launch at login"
+            value={autoLaunch}
+            onChange={handleAutoLaunchToggle}
+          />
         </Section>
 
       </div>

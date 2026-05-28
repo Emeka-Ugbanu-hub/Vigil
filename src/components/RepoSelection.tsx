@@ -22,6 +22,7 @@ export const RepoSelection: React.FC<Props> = ({ onComplete }) => {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [limitMessage, setLimitMessage] = useState('');
 
   useEffect(() => {
     invoke<AvailableRepo[]>('fetch_available_repos')
@@ -38,14 +39,21 @@ export const RepoSelection: React.FC<Props> = ({ onComplete }) => {
   function toggle(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) { next.delete(id); }
+      else if (next.size >= 4) {
+        setLimitMessage('You can select up to 4 repos.');
+        return prev;
+      }
+      else { next.add(id); }
+      if (next.size <= 4) {
+        setLimitMessage('');
+      }
       return next;
     });
   }
 
   function selectAll() {
-    setSelected(new Set(repos.map((r) => r.id)));
+    setSelected(new Set(repos.slice(0, 4).map((r) => r.id)));
   }
 
   function deselectAll() {
@@ -103,7 +111,7 @@ export const RepoSelection: React.FC<Props> = ({ onComplete }) => {
             Choose repos
           </div>
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.48)', fontWeight: 700, lineHeight: 1.3 }}>
-            Select the repos you want Vigil to watch
+            Select up to 4 repos ({selected.size}/4 chosen)
           </div>
         </div>
       </div>
@@ -133,6 +141,11 @@ export const RepoSelection: React.FC<Props> = ({ onComplete }) => {
             None
           </button>
         </div>
+        {limitMessage && (
+          <div style={{ fontSize: 10, color: ui.yellow, fontWeight: 700, marginBottom: 6 }}>
+            {limitMessage}
+          </div>
+        )}
 
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {filtered.map((repo) => {

@@ -29,6 +29,54 @@ It polls every 30s–5min (adaptive), uses ETags to minimize API calls, and neve
 
 ---
 
+## Install (macOS)
+
+Download the `.dmg` from the [releases page](https://github.com/Emeka-Ugbanu-hub/Vigil/releases/latest). Open it, drag Vigil to Applications. First launch: right-click → Open (Gatekeeper bypass).
+
+## Build from source (Windows & Linux)
+
+### Prerequisites (all platforms)
+- **Rust** — https://rustup.rs
+- **Node.js 18+** — https://nodejs.org
+- **Git**
+
+### Linux — install system deps first
+```bash
+# Ubuntu / Debian
+sudo apt update
+sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+# Fedora
+sudo dnf install webkit2gtk4.1-devel libappindicator-gtk3-devel librsvg2-devel patchelf
+
+# Arch
+sudo pacman -S webkit2gtk-4.1 libappindicator-gtk3 librsvg patchelf
+```
+
+### Build (Windows & Linux)
+```bash
+git clone https://github.com/Emeka-Ugbanu-hub/Vigil.git
+cd Vigil
+npm install
+npm run tauri build
+```
+
+**Output:**
+- **Windows:** `src-tauri\target\release\bundle\msi\Vigil_0.1.0_x64.msi` — double-click to install
+- **Linux:** `src-tauri/target/release/bundle/deb/Vigil_0.1.0_amd64.deb` — `sudo dpkg -i` to install
+
+## Run from source (dev mode)
+
+```bash
+git clone https://github.com/Emeka-Ugbanu-hub/Vigil.git
+cd Vigil
+npm install
+npm run tauri dev
+# Or if that fails: cd src-tauri && cargo run
+```
+
+---
+
 ## What it detects
 
 | Signal | Detection method |
@@ -58,32 +106,6 @@ It polls every 30s–5min (adaptive), uses ETags to minimize API calls, and neve
 - **Storage:** SQLite (local, no cloud)
 - **Polling:** Smart adaptive polling with ETags + notifications tripwire
 - **Auth:** GitHub OAuth Device Flow (repo:read + user:read)
-
----
-
-## Run from source
-
-```bash
-# Prerequisites
-# Node.js 18+, Rust 1.77+
-
-git clone https://github.com/Emeka-Ugbanu-hub/Vigil.git
-cd Vigil
-npm install
-npm run tauri dev
-```
-
----
-
-## Build for distribution
-
-```bash
-npm run tauri build
-# outputs in src-tauri/target/release/bundle/
-# macOS: Vigil.dmg
-# Windows: Vigil.msi
-# Linux: Vigil.deb
-```
 
 ---
 

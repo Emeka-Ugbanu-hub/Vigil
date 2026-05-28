@@ -49,5 +49,7 @@ export async function closeWindow(): Promise<void> {
 }
 
 export async function setWindowSize(width: number, height: number): Promise<void> {
-  await invoke('resize_popover', { width, height }).catch(() => {});
+  const ipc = getIPC();
+  if (!ipc) return;
+  await ipc.invoke('plugin:window|set_size', { value: { Logical: { width, height } } }).catch(() => {});
 }

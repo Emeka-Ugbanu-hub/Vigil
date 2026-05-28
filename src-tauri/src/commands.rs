@@ -111,6 +111,8 @@ pub fn get_settings<R: Runtime>(app: AppHandle<R>) -> HashMap<String, String> {
         "ci_main_weight",
         "github_token",
         "github_username",
+        "github_client_id",
+        "github_avatar_url",
     ];
 
     let mut map = HashMap::new();
@@ -236,7 +238,7 @@ pub fn get_pending_auth<R: Runtime>(app: AppHandle<R>) -> bool {
 }
 
 #[tauri::command]
-pub async fn test_client_id<R: Runtime>(app: AppHandle<R>, client_id: String) -> Result<String, String> {
+pub async fn test_client_id<R: Runtime>(_app: AppHandle<R>, client_id: String) -> Result<String, String> {
     if client_id.trim().is_empty() {
         return Err("NO_CLIENT_ID: Client ID is empty.".to_string());
     }
@@ -285,10 +287,15 @@ pub async fn fetch_available_repos<R: Runtime>(
     }
     let repos = github::fetch_user_repos(&token).await?;
 
-    // Filter out repos already in the DB — only show unadded ones
+    // Save which repos are new before upserting all
     let existing: std::collections::HashSet<String> =
         db::get_repos_list(&app).into_iter().map(|r| r.id).collect();
-    let new_repos: Vec<_> = repos.into_iter().filter(|r| !existing.contains(&r.id)).collect();
+    let new_repos: Vec<_> = repos.iter().filter(|r| !existing.contains(&r.id)).cloned().collect();
+
+    // Upsert all repos into DB (preserves existing enabled status)
+    for repo in &repos {
+        db::upsert_repo(&app, &repo.id, &repo.full_name, &repo.owner);
+    }
 
     Ok(new_repos)
 }

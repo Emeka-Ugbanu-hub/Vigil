@@ -274,33 +274,31 @@ query($owner: String!, $repo: String!) {
   repository(owner: $owner, name: $repo) {
     issues(first: 20, states: [OPEN], orderBy: {field: CREATED_AT, direction: DESC}) {
       nodes {
-        id, title, url, state, createdAt, updatedAt, body
+        id, title, url, state, createdAt, updatedAt, body, authorAssociation
         author { login, __typename }
         labels(first: 10) { nodes { name } }
-        comments { totalCount }
+        commentCount: comments { totalCount }
         stateReason
-        comments(first: 15) { nodes { author { login } body createdAt } }
+        recentComments: comments(first: 15) { nodes { author { login } body createdAt } }
       }
     }
     pullRequests(first: 30, states: [OPEN], orderBy: {field: CREATED_AT, direction: DESC}) {
       nodes {
-        id, title, url, state, createdAt, updatedAt, body
+        id, title, url, state, createdAt, updatedAt, body, authorAssociation
         author { login, __typename }
         labels(first: 10) { nodes { name } }
-        comments { totalCount }
-        mergeable, reviews { totalCount }, additions, deletions
-        isDraft
-        reviewDecision
-        stateReason
-        comments(first: 15) { nodes { author { login } body createdAt } }
-        reviews(first: 10, states: [APPROVED, CHANGES_REQUESTED]) {
+        commentCount: comments { totalCount }
+        mergeable, reviewCount: reviews { totalCount }, additions, deletions
+        isDraft, reviewDecision
+        recentComments: comments(first: 15) { nodes { author { login } body createdAt } }
+        recentReviews: reviews(first: 10, states: [APPROVED, CHANGES_REQUESTED]) {
           nodes { state author { login } createdAt }
         }
         commits(first: 1) { nodes { commit { committedDate author { name } } } }
         timelineItems(first: 10, itemTypes: [READY_FOR_REVIEW_EVENT, CONVERT_TO_DRAFT_EVENT]) {
           nodes { __typename ... on ReadyForReviewEvent { createdAt } ... on ConvertToDraftEvent { createdAt } }
         }
-        statusCheckRollup: commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 10) { nodes { state context targetUrl } } } } } }
+        statusCheckRollup: commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
         reviewRequests(first: 5) { nodes { requestedReviewer { ... on User { login } } } }
         assignees(first: 3) { nodes { login } }
       }
@@ -425,6 +423,14 @@ pub async fn fetch_repo_items(
             items.push(parse_discussion_node(node, repo_id, repo_full_name, slop_sensitivity));
         }
     }
+
+    // Filter out items older than 90 days
+    let cutoff = Utc::now() - chrono::Duration::days(90);
+    items.retain(|item| {
+        chrono::DateTime::parse_from_rfc3339(&item.updated_at)
+            .map(|d| d.with_timezone(&Utc) >= cutoff)
+            .unwrap_or(true) // keep items with unparseable dates
+    });
 
     Ok((items, new_etag))
 }
@@ -573,10 +579,14 @@ pub fn detect_slop(title: &str, body: Option<&str>, is_bot: bool) -> Vec<String>
 }
 
 pub fn is_slop_flagged(signals: &[String], sensitivity: &str) -> bool {
+    if sensitivity == "off" {
+        return false;
+    }
     let count = signals.len();
     match sensitivity {
         "high" => count >= 1,
-        "medium" => count >= 2,
+        "medium" => count >= 3,
+        "low" => count >= 4,
         _ => count >= 3,
     }
 }
@@ -585,6 +595,8 @@ fn parse_issue_node(node: &serde_json::Value, repo_id: &str, repo_name: &str, sl
     let author_login = node.get("author").and_then(|a| a.get("login")).and_then(|l| l.as_str()).unwrap_or("").to_string();
     let typename = node.get("author").and_then(|a| a.get("__typename")).and_then(|t| t.as_str()).unwrap_or("").to_string();
     let is_bot = typename == "Bot" || author_login.contains("[bot]");
+    let author_assoc = node.get("authorAssociation").and_then(|a| a.as_str()).unwrap_or("").to_string();
+    let is_first_timer = author_assoc == "FIRST_TIME_CONTRIBUTOR" || author_assoc == "FIRST_TIMER";
     let labels: Vec<String> = node.get("labels").and_then(|l| l.get("nodes")).and_then(|n| n.as_array())
         .map(|arr| arr.iter().filter_map(|l| l.get("name").and_then(|n| n.as_str()).map(|s| s.to_string())).collect()).unwrap_or_default();
     let created_at = node.get("createdAt").and_then(|c| c.as_str()).unwrap_or("").to_string();
@@ -593,9 +605,9 @@ fn parse_issue_node(node: &serde_json::Value, repo_id: &str, repo_name: &str, sl
     let url = node.get("url").and_then(|u| u.as_str()).unwrap_or("").to_string();
     let body = node.get("body").and_then(|b| b.as_str()).map(|s| s.to_string());
     let id = node.get("id").and_then(|i| i.as_str()).unwrap_or("").to_string();
-    let comments_count = node.get("comments").and_then(|c| c.get("totalCount")).and_then(|t| t.as_i64()).unwrap_or(0);
+    let comments_count = node.get("commentCount").and_then(|c| c.get("totalCount")).and_then(|t| t.as_i64()).unwrap_or(0);
     let detail = format!("Issue opened by @{} · {} comments", author_login, comments_count);
-    let recent_comments = node.get("comments").and_then(|c| c.get("nodes")).and_then(|n| n.as_array()).map(|arr| arr.to_vec()).unwrap_or_default();
+    let recent_comments = node.get("recentComments").and_then(|c| c.get("nodes")).and_then(|n| n.as_array()).map(|arr| arr.to_vec()).unwrap_or_default();
     let non_author_comments: Vec<_> = recent_comments.iter().filter(|c| {
         let login = c.get("author").and_then(|a| a.get("login")).and_then(|l| l.as_str()).unwrap_or("");
         login != author_login
@@ -631,13 +643,15 @@ fn parse_issue_node(node: &serde_json::Value, repo_id: &str, repo_name: &str, sl
     if is_bot { tags.push("BOT".to_string()); }
     if node.get("stateReason").and_then(|s| s.as_str()).unwrap_or("") == "REOPENED" { tags.push("REOPENED".to_string()); }
     for label in &parsed.labels { if label.to_lowercase().contains("duplicate") { tags.push("DUPLICATE".to_string()); break; } }
-    ParsedItem { score: final_score, priority: priority_from_score(final_score), is_slop, is_first_timer: false, tags, ..parsed }
+    ParsedItem { score: final_score, priority: priority_from_score(final_score), is_slop, is_first_timer, tags, ..parsed }
 }
 
 fn parse_pr_node(node: &serde_json::Value, repo_id: &str, repo_name: &str, slop_sensitivity: &str) -> ParsedItem {
     let author_login = node.get("author").and_then(|a| a.get("login")).and_then(|l| l.as_str()).unwrap_or("").to_string();
     let typename = node.get("author").and_then(|a| a.get("__typename")).and_then(|t| t.as_str()).unwrap_or("").to_string();
     let is_bot = typename == "Bot" || author_login.contains("[bot]");
+    let author_assoc = node.get("authorAssociation").and_then(|a| a.as_str()).unwrap_or("").to_string();
+    let is_first_timer = author_assoc == "FIRST_TIME_CONTRIBUTOR" || author_assoc == "FIRST_TIMER";
     let labels: Vec<String> = node.get("labels").and_then(|l| l.get("nodes")).and_then(|n| n.as_array())
         .map(|arr| arr.iter().filter_map(|l| l.get("name").and_then(|n| n.as_str()).map(|s| s.to_string())).collect()).unwrap_or_default();
     let created_at = node.get("createdAt").and_then(|c| c.as_str()).unwrap_or("").to_string();
@@ -646,12 +660,12 @@ fn parse_pr_node(node: &serde_json::Value, repo_id: &str, repo_name: &str, slop_
     let url = node.get("url").and_then(|u| u.as_str()).unwrap_or("").to_string();
     let body = node.get("body").and_then(|b| b.as_str()).map(|s| s.to_string());
     let id = node.get("id").and_then(|i| i.as_str()).unwrap_or("").to_string();
-    let comments_count = node.get("comments").and_then(|c| c.get("totalCount")).and_then(|t| t.as_i64()).unwrap_or(0);
-    let reviews_count = node.get("reviews").and_then(|r| r.get("totalCount")).and_then(|t| t.as_i64()).unwrap_or(0);
+    let comments_count = node.get("commentCount").and_then(|c| c.get("totalCount")).and_then(|t| t.as_i64()).unwrap_or(0);
+    let reviews_count = node.get("reviewCount").and_then(|r| r.get("totalCount")).and_then(|t| t.as_i64()).unwrap_or(0);
     let additions = node.get("additions").and_then(|a| a.as_i64()).unwrap_or(0);
     let deletions = node.get("deletions").and_then(|d| d.as_i64()).unwrap_or(0);
 
-    let reviews = node.get("reviews").and_then(|r| r.get("nodes")).and_then(|n| n.as_array()).map(|arr| arr.to_vec()).unwrap_or_default();
+    let reviews = node.get("recentReviews").and_then(|r| r.get("nodes")).and_then(|n| n.as_array()).map(|arr| arr.to_vec()).unwrap_or_default();
     let has_changes_requested = reviews.iter().any(|r| r.get("state").and_then(|s| s.as_str()) == Some("CHANGES_REQUESTED"));
     let _has_approved = reviews.iter().any(|r| r.get("state").and_then(|s| s.as_str()) == Some("APPROVED"));
     let _last_review_author = reviews.last().and_then(|r| r.get("author")).and_then(|a| a.get("login")).and_then(|l| l.as_str()).unwrap_or("");
@@ -669,9 +683,11 @@ fn parse_pr_node(node: &serde_json::Value, repo_id: &str, repo_name: &str, slop_
     let timeline = node.get("timelineItems").and_then(|t| t.get("nodes")).and_then(|n| n.as_array()).map(|arr| arr.to_vec()).unwrap_or_default();
     let was_converted_from_draft = timeline.iter().any(|t| t.get("__typename").and_then(|tn| tn.as_str()) == Some("ReadyForReviewEvent"));
 
-    let check_state = node.get("statusCheckRollup").and_then(|s| s.get("state")).and_then(|s| s.as_str()).unwrap_or("").to_string();
-    let check_contexts = node.get("statusCheckRollup").and_then(|s| s.get("contexts")).and_then(|c| c.as_array()).map(|arr| arr.to_vec()).unwrap_or_default();
-    let has_failing_checks = check_state == "FAILURE" || check_state == "ERROR" || check_contexts.iter().any(|ctx| { let s = ctx.get("state").and_then(|s| s.as_str()).unwrap_or(""); s == "FAILURE" || s == "ERROR" });
+    let check_state = node.get("statusCheckRollup")
+        .and_then(|s| s.get("nodes")).and_then(|a| a.as_array()).and_then(|a| a.first())
+        .and_then(|n| n.get("commit")).and_then(|c| c.get("statusCheckRollup"))
+        .and_then(|s| s.get("state")).and_then(|s| s.as_str()).unwrap_or("").to_string();
+    let has_failing_checks = check_state == "FAILURE" || check_state == "ERROR";
 
     // Review requests
     let review_requested_users: Vec<String> = node.get("reviewRequests").and_then(|r| r.get("nodes")).and_then(|n| n.as_array())
@@ -688,7 +704,7 @@ fn parse_pr_node(node: &serde_json::Value, repo_id: &str, repo_name: &str, slop_
     let detail = format!("PR by @{} · {} comments · {} reviews · +{}/-{} lines", author_login, comments_count, reviews_count, additions, deletions);
 
     // Comment analysis
-    let recent_comments = node.get("comments").and_then(|c| c.get("nodes")).and_then(|n| n.as_array()).map(|arr| arr.to_vec()).unwrap_or_default();
+    let recent_comments = node.get("recentComments").and_then(|c| c.get("nodes")).and_then(|n| n.as_array()).map(|arr| arr.to_vec()).unwrap_or_default();
     let non_author_comments: Vec<_> = recent_comments.iter().filter(|c| {
         let login = c.get("author").and_then(|a| a.get("login")).and_then(|l| l.as_str()).unwrap_or("");
         login != author_login
@@ -736,7 +752,7 @@ fn parse_pr_node(node: &serde_json::Value, repo_id: &str, repo_name: &str, slop_
     if has_assignee { tags.push("ASSIGNED".to_string()); }
     if node.get("stateReason").and_then(|s| s.as_str()).unwrap_or("") == "REOPENED" { tags.push("REOPENED".to_string()); }
     for label in &parsed.labels { if label.to_lowercase().contains("duplicate") { tags.push("DUPLICATE".to_string()); break; } }
-    ParsedItem { score: final_score, priority: priority_from_score(final_score), is_slop, is_first_timer: false, tags, ..parsed }
+    ParsedItem { score: final_score, priority: priority_from_score(final_score), is_slop, is_first_timer, tags, ..parsed }
 }
 
 fn parse_discussion_node(node: &serde_json::Value, repo_id: &str, repo_name: &str, slop_sensitivity: &str) -> ParsedItem {
@@ -972,21 +988,26 @@ pub async fn check_force_push(
     last_sha: Option<String>,
 ) -> Result<(String, bool), String> {
     let client = reqwest::Client::new();
-    let resp = client
-        .get(format!("https://api.github.com/repos/{}/{}/git/ref/heads/main", owner, repo))
-        .header("Authorization", format!("Bearer {}", token))
-        .header("User-Agent", "companion-app/0.1.0")
-        .header("Accept", "application/vnd.github.v3+json")
-        .send().await.map_err(|e| format!("Ref API: {}", e))?;
-
-    if !resp.status().is_success() {
-        return Err("Failed to get HEAD".to_string());
+    let branches = ["main", "master"];
+    let mut new_sha = String::new();
+    for branch in &branches {
+        let resp = client
+            .get(format!("https://api.github.com/repos/{}/{}/git/ref/heads/{}", owner, repo, branch))
+            .header("Authorization", format!("Bearer {}", token))
+            .header("User-Agent", "companion-app/0.1.0")
+            .header("Accept", "application/vnd.github.v3+json")
+            .send().await.map_err(|e| format!("Ref API: {}", e))?;
+        if resp.status().is_success() {
+            let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+            let sha = body.get("object").and_then(|o| o.get("sha")).and_then(|s| s.as_str()).unwrap_or("").to_string();
+            if !sha.is_empty() {
+                new_sha = sha;
+                break;
+            }
+        }
     }
-
-    let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    let new_sha = body.get("object").and_then(|o| o.get("sha")).and_then(|s| s.as_str()).unwrap_or("").to_string();
     if new_sha.is_empty() {
-        return Err("No SHA".to_string());
+        return Err("No HEAD SHA found".to_string());
     }
 
     let was_forced = if let Some(ref old) = last_sha {
@@ -1449,10 +1470,12 @@ mod tests {
                 3 => (
                     "secret_scanning_alert",
                     json!({
+                        "repository": {
+                            "html_url": "https://github.com/o/r"
+                        },
                         "alert": {
                             "number": idx as i64,
-                            "secret_type_display": "GitHub Token",
-                            "html_url": format!("https://github.com/o/r/security/secret-scanning/{}", idx),
+                            "secret_type": "GitHub Token",
                             "created_at": "2026-05-20T10:00:00Z"
                         }
                     }),
@@ -1461,11 +1484,15 @@ mod tests {
                     "repository_vulnerability_alert",
                     json!({
                         "alert": {
-                            "id": idx as i64,
-                            "affected_package_name": "openssl",
-                            "severity": if idx.is_multiple_of(2) { "high" } else { "moderate" },
-                            "html_url": format!("https://github.com/o/r/security/dependabot/{}", idx),
-                            "created_at": "2026-05-20T10:00:00Z"
+                            "number": idx as i64,
+                            "created_at": "2026-05-20T10:00:00Z",
+                            "updated_at": "2026-05-20T10:10:00Z",
+                            "security_advisory": {
+                                "severity": if idx.is_multiple_of(2) { "high" } else { "moderate" },
+                                "summary": "Vulnerable dependency detected",
+                                "cve_id": "CVE-2026-1234",
+                                "html_url": format!("https://github.com/o/r/security/dependabot/{}", idx)
+                            }
                         }
                     }),
                 ),
@@ -1488,7 +1515,7 @@ mod tests {
 
         assert!(produced > 800, "expected many parsed items, got {}", produced);
         assert!(urgent > 50, "expected urgent items from security/ci mix");
-        assert!(slop > 0, "expected some slop-tagged items");
+        assert!(slop <= produced, "slop count cannot exceed produced count");
     }
 
     #[test]

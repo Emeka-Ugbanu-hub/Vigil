@@ -38,18 +38,23 @@ export const RepoManagement: React.FC<Props> = ({ onBack }) => {
     const repo = repos.find((r) => r.id === id);
     if (!repo) return;
     const nextEnabled = !repo.enabled;
+    if (nextEnabled) {
+      const currentlyEnabled = repos.filter(r => r.enabled).length;
+      if (currentlyEnabled >= 4) {
+        window.alert('You can watch up to 4 repos. Disable one before enabling another.');
+        return;
+      }
+    }
     await invoke('set_repo_enabled', { repoId: id, enabled: nextEnabled });
     setRepos((prev) => prev.map((r) => (r.id === id ? { ...r, enabled: nextEnabled } : r)));
   }
 
   async function handleRemove(id: string) {
-    if (!window.confirm('Remove this repo? Items will stay in the inbox but stop syncing.')) return;
     await invoke('remove_repo', { repoId: id });
     setRepos((prev) => prev.filter((r) => r.id !== id));
   }
 
   async function handleClear(id: string) {
-    if (!window.confirm('Clear all items for this repo?')) return;
     await invoke('dismiss_repo_items', { repoId: id });
   }
 
@@ -93,7 +98,7 @@ export const RepoManagement: React.FC<Props> = ({ onBack }) => {
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               onClick={async () => {
-                if (!window.confirm('Disable all repos? Sync will stop for everything.')) return;
+                if (!window.confirm('Disable all watched repos?')) return;
                 for (const r of repos) {
                   await invoke('set_repo_enabled', { repoId: r.id, enabled: false });
                 }
@@ -105,7 +110,7 @@ export const RepoManagement: React.FC<Props> = ({ onBack }) => {
             </button>
             <button
               onClick={async () => {
-                if (!window.confirm('Remove ALL repos? This cannot be undone.')) return;
+                if (!window.confirm('Remove all repos from Vigil?')) return;
                 for (const r of repos) {
                   await invoke('remove_repo', { repoId: r.id });
                 }

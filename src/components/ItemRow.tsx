@@ -6,8 +6,8 @@ import type { Item } from '../engine/types';
 interface Props {
   item: Item;
   isTop: boolean;
-  onClick: () => void;
-  onDismiss: (id: string) => void;
+  onClick?: () => void;
+  onDismiss?: (id: string) => void;
 }
 
 export const ItemRow: React.FC<Props> = ({ item, isTop, onClick, onDismiss }) => {
@@ -58,26 +58,28 @@ export const ItemRow: React.FC<Props> = ({ item, isTop, onClick, onDismiss }) =>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', whiteSpace: 'nowrap', fontWeight: 700 }}>{timeAgo}</span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDismiss(item.id);
-          }}
-          title="Remove from inbox"
-          style={{
-            width: 22,
-            height: 22,
-            borderRadius: 0,
-            border: '1px solid rgba(255,255,255,0.12)',
-            background: 'rgba(255,255,255,0.05)',
-            color: 'rgba(255,255,255,0.55)',
-            fontSize: 13,
-            cursor: 'pointer',
-            lineHeight: 1,
-          }}
-        >
-          ×
-        </button>
+        {onDismiss && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDismiss(item.id);
+            }}
+            title="Remove from inbox"
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 0,
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.05)',
+              color: 'rgba(255,255,255,0.55)',
+              fontSize: 13,
+              cursor: 'pointer',
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+        )}
         <span style={{ fontSize: 17, color: 'rgba(255,255,255,0.28)', lineHeight: 1 }}>›</span>
       </div>
     </div>

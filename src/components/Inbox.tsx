@@ -20,6 +20,7 @@ export const Inbox: React.FC<Props> = ({ onBack, onOpenSettings, onOpenDetail, i
   const [activeTab, setActiveTab] = useState<Tab>(initialTab || 'all');
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
   const [repos, setRepos] = useState<Repo[]>([]);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     invoke<Repo[]>('get_repos').then(setRepos).catch(() => {});
@@ -62,6 +63,34 @@ export const Inbox: React.FC<Props> = ({ onBack, onOpenSettings, onOpenDetail, i
 
   // Short names for repo pills
   const shortName = (r: Repo) => r.name.split('/').pop()?.slice(0, 8) || r.name;
+
+  // Group items by repo_name + title
+  const grouped = (() => {
+    const map = new Map<string, Item[]>();
+    for (const item of items) {
+      const key = `${item.repo_name}|${item.title}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(item);
+    }
+    return Array.from(map.entries()).map(([key, groupItems]) => ({ key, items: groupItems }));
+  })();
+
+  function toggleExpand(key: string) {
+    setExpanded(prev => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
+  }
+
+  function getTimeAgo(dateStr: string) {
+    const now = Date.now(); const date = new Date(dateStr).getTime();
+    const diffSec = Math.floor((now - date) / 1000);
+    if (diffSec < 60) return 'now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m`;
+    const diffHrs = Math.floor(diffMin / 60);
+    if (diffHrs < 24) return `${diffHrs}h`;
+    const diffDays = Math.floor(diffHrs / 24);
+    if (diffDays < 30) return `${diffDays}d`;
+    return `${Math.floor(diffDays / 30)}mo`;
+  }
 
   return (
     <div style={{ ...shellStyle(300, 540), height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -106,56 +135,94 @@ export const Inbox: React.FC<Props> = ({ onBack, onOpenSettings, onOpenDetail, i
               {shortName(repo)}
             </div>
           ))}
-          {items.length > 0 && (
-            <div style={{ padding: '8px 14px 10px', display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                onClick={async () => {
-                  const label = activeRepo ? 'this repo' : 'all repos';
-                  if (!window.confirm(`Clear all items for ${label}?`)) return;
-                  setItems([]);
-                  if (activeRepo) {
-                    await invoke('dismiss_repo_items', { repoId: activeRepo });
-                    loadData();
-                  } else {
-                    const all = await invoke<Repo[]>('get_repos');
-                    for (const r of all) {
-                      await invoke('dismiss_repo_items', { repoId: r.id }).catch(() => {});
-                    }
-                    loadData();
-                  }
-                }}
-                style={{
-                  padding: '5px 16px',
-                  borderRadius: 0,
-                  fontSize: 10,
-                  fontWeight: 800,
-                  background: ui.glass,
-                  color: ui.textMuted,
-                  border: `1px solid ${ui.borderStrong}`,
-                  cursor: 'pointer',
-                }}
-              >
-                Clear {activeRepo ? shortName(repos.find(r => r.id === activeRepo)!) : 'all'}
-              </button>
-            </div>
-          )}
+        </div>
+      )}
+
+      {items.length > 0 && (
+        <div style={{ padding: '8px 14px 10px', display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={async () => {
+              setItems([]);
+              if (activeRepo) {
+                await invoke('dismiss_repo_items', { repoId: activeRepo });
+                loadData();
+              } else {
+                const all = await invoke<Repo[]>('get_repos');
+                for (const r of all) {
+                  await invoke('dismiss_repo_items', { repoId: r.id }).catch(() => {});
+                }
+                loadData();
+              }
+            }}
+            style={{
+              padding: '5px 16px',
+              borderRadius: 0,
+              fontSize: 10,
+              fontWeight: 800,
+              background: ui.glass,
+              color: ui.textMuted,
+              border: `1px solid ${ui.borderStrong}`,
+              cursor: 'pointer',
+            }}
+          >
+            Clear {activeRepo ? shortName(repos.find(r => r.id === activeRepo)!) : 'all'}
+          </button>
         </div>
       )}
 
       <div style={{ ...contentStyle, paddingTop: 2, flex: 1 }}>
-        {items.length === 0 && (
+        {grouped.length === 0 && (
           <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.38)', fontWeight: 700 }}>
             All clear — nothing needs you right now.
           </div>
         )}
-        {items.map((item, idx) => (
-          <ItemRow
-            key={item.id}
-            item={item}
-            isTop={idx === 0}
-            onClick={() => onOpenDetail(item.id)}
-            onDismiss={handleDismiss}
-          />
+        {grouped.map((group, idx) => (
+          <div key={group.key}>
+            <div
+              onClick={() => { if (group.items.length > 1) toggleExpand(group.key); }}
+              style={{ position: 'relative', cursor: group.items.length > 1 ? 'pointer' : undefined }}
+            >
+              <ItemRow
+                item={group.items[0]}
+                isTop={idx === 0 && !expanded.has(group.key)}
+                onClick={group.items.length === 1 ? (() => onOpenDetail(group.items[0].id)) : undefined}
+                onDismiss={group.items.length === 1 ? handleDismiss : undefined}
+              />
+              {group.items.length > 1 && (
+                <div style={{
+                  position: 'absolute', top: 6, right: 8,
+                  background: ui.surfaceElevated, border: `1px solid ${ui.borderStrong}`,
+                  padding: '2px 7px', borderRadius: 0,
+                  fontSize: 9, fontWeight: 900, color: ui.textMuted,
+                }}>
+                  ×{group.items.length}
+                </div>
+              )}
+            </div>
+            {expanded.has(group.key) && (
+              <div style={{ margin: '-4px 10px 6px', background: ui.surface, border: `1px solid ${ui.border}`, borderTop: 'none' }}>
+                {group.items.map((item, subIdx) => (
+                  <div key={item.id} onClick={() => onOpenDetail(item.id)} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '5px 10px 5px 12px',
+                    borderBottom: subIdx < group.items.length - 1 ? `1px solid ${ui.border}` : 'none',
+                    cursor: 'pointer', fontSize: 11, color: ui.textMuted, fontWeight: 700,
+                    transition: 'background 0.1s',
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.background = ui.glass; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>
+                      <span style={{ color: ui.red }}>●</span> {item.detail}
+                    </div>
+                    <div style={{ flexShrink: 0, fontSize: 9, color: ui.textFaint, fontWeight: 700 }}>
+                      {getTimeAgo(item.updated_at)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         ))}
       </div>
     </div>

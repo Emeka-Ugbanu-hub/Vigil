@@ -113,6 +113,7 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error::Er
             raw_payload TEXT DEFAULT '',
             emoji TEXT DEFAULT '',
             tags TEXT DEFAULT '[]',
+            comments_count INTEGER DEFAULT 0,
             FOREIGN KEY (repo_id) REFERENCES repos(id)
         );
 
@@ -146,6 +147,10 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error::Er
         ",
     )?;
 
+    // Migrations for existing DBs
+    conn.execute("ALTER TABLE items ADD COLUMN comments_count INTEGER DEFAULT 0", []).ok();
+    conn.execute("ALTER TABLE items ADD COLUMN raw_payload TEXT DEFAULT ''", []).ok();
+
     let state = AppState {
         db: Arc::new(Mutex::new(conn)),
     };
@@ -169,7 +174,7 @@ pub fn get_items<R: Runtime>(
     let conn = get_db(app);
     let conn = conn.lock().unwrap();
     let mut sql = String::from(
-        "SELECT i.id, i.repo_id, COALESCE(r.name, 'unknown') as repo_name, i.type, i.priority, i.title, i.detail, i.score, i.is_bot, i.is_slop, i.is_first_timer, i.dismissed, i.created_at, i.updated_at, i.github_url, i.emoji, i.tags FROM items i LEFT JOIN repos r ON i.repo_id = r.id WHERE 1=1"
+        "SELECT i.id, i.repo_id, COALESCE(r.name, 'unknown') as repo_name, i.type, i.priority, i.title, i.detail, i.score, i.is_bot, i.is_slop, i.is_first_timer, i.dismissed, i.created_at, i.updated_at, i.github_url, i.emoji, i.tags, i.comments_count, i.raw_payload FROM items i LEFT JOIN repos r ON i.repo_id = r.id WHERE 1=1"
     );
     let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
 
@@ -220,8 +225,8 @@ pub fn get_items<R: Runtime>(
                         .unwrap_or_else(|_| "[]".to_string()),
                 )
                 .unwrap_or_default(),
-                comments_count: 0,
-                body: None,
+                comments_count: row.get::<_, i64>(17).unwrap_or(0),
+                body: row.get::<_, Option<String>>(18).ok().flatten().filter(|s| !s.is_empty()),
             })
         })
         .unwrap();
@@ -233,7 +238,7 @@ pub fn get_item_by_id<R: Runtime>(app: &AppHandle<R>, id: &str) -> Option<Item> 
     let conn = get_db(app);
     let conn = conn.lock().unwrap();
     let mut stmt = conn.prepare(
-        "SELECT i.id, i.repo_id, COALESCE(r.name, 'unknown') as repo_name, i.type, i.priority, i.title, i.detail, i.score, i.is_bot, i.is_slop, i.is_first_timer, i.dismissed, i.created_at, i.updated_at, i.github_url, i.emoji, i.tags FROM items i LEFT JOIN repos r ON i.repo_id = r.id WHERE i.id = ?"
+        "SELECT i.id, i.repo_id, COALESCE(r.name, 'unknown') as repo_name, i.type, i.priority, i.title, i.detail, i.score, i.is_bot, i.is_slop, i.is_first_timer, i.dismissed, i.created_at, i.updated_at, i.github_url, i.emoji, i.tags, i.comments_count, i.raw_payload FROM items i LEFT JOIN repos r ON i.repo_id = r.id WHERE i.id = ?"
     ).unwrap();
 
     stmt.query_row(params![id], |row| {
@@ -259,8 +264,8 @@ pub fn get_item_by_id<R: Runtime>(app: &AppHandle<R>, id: &str) -> Option<Item> 
                     .unwrap_or_else(|_| "[]".to_string()),
             )
             .unwrap_or_default(),
-            comments_count: 0,
-            body: None,
+            comments_count: row.get::<_, i64>(17).unwrap_or(0),
+            body: row.get::<_, Option<String>>(18).ok().flatten().filter(|s| !s.is_empty()),
         })
     })
     .ok()
@@ -385,15 +390,17 @@ pub fn upsert_item<R: Runtime>(app: &AppHandle<R>, item: &crate::github::ParsedI
     let db = get_db(app);
     let conn = db.lock().unwrap();
     let tags_json = serde_json::to_string(&item.tags).unwrap_or_default();
+    let body_str = item.body.as_deref().unwrap_or("");
     let result = conn.execute(
-        "INSERT OR REPLACE INTO items (id, repo_id, type, priority, title, detail, score, is_bot, is_slop, is_first_timer, dismissed, created_at, updated_at, github_url, emoji, tags)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT dismissed FROM items WHERE id = ?), 0), ?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO items (id, repo_id, type, priority, title, detail, score, is_bot, is_slop, is_first_timer, dismissed, created_at, updated_at, github_url, emoji, tags, comments_count, raw_payload)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT dismissed FROM items WHERE id = ?), 0), ?, ?, ?, ?, ?, ?, ?)",
         params![
             item.id, item.repo_id, item.item_type, item.priority,
             item.title, item.detail, item.score,
             item.is_bot as i64, item.is_slop as i64, item.is_first_timer as i64,
-            item.id, // for dismissed check
+            item.id,
             item.created_at, item.updated_at, item.github_url, item.emoji, tags_json,
+            item.comments_count, body_str,
         ],
     );
     result.is_ok()
@@ -414,34 +421,34 @@ pub fn get_summary<R: Runtime>(app: &AppHandle<R>) -> Summary {
     let db = get_db(app);
     let conn = db.lock().unwrap();
     let total_items: i64 = conn
-        .query_row("SELECT COUNT(*) FROM items WHERE dismissed = 0", [], |r| {
+        .query_row("SELECT COUNT(DISTINCT repo_id || '|' || title) FROM items WHERE dismissed = 0", [], |r| {
             r.get(0)
         })
         .unwrap_or(0);
     let urgent_count: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM items WHERE priority = 'urgent' AND dismissed = 0",
+            "SELECT COUNT(DISTINCT repo_id || '|' || title) FROM items WHERE priority = 'urgent' AND dismissed = 0",
             [],
             |r| r.get(0),
         )
         .unwrap_or(0);
     let today_count: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM items WHERE priority = 'today' AND dismissed = 0",
+            "SELECT COUNT(DISTINCT repo_id || '|' || title) FROM items WHERE priority = 'today' AND dismissed = 0",
             [],
             |r| r.get(0),
         )
         .unwrap_or(0);
     let later_count: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM items WHERE priority = 'later' AND dismissed = 0",
+            "SELECT COUNT(DISTINCT repo_id || '|' || title) FROM items WHERE priority = 'later' AND dismissed = 0",
             [],
             |r| r.get(0),
         )
         .unwrap_or(0);
     let noise_count: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM items WHERE priority = 'noise' AND dismissed = 0",
+            "SELECT COUNT(DISTINCT repo_id || '|' || title) FROM items WHERE priority = 'noise' AND dismissed = 0",
             [],
             |r| r.get(0),
         )
@@ -453,63 +460,63 @@ pub fn get_summary<R: Runtime>(app: &AppHandle<R>) -> Summary {
         .unwrap_or(0);
     let critial_cves: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM items WHERE type = 'security' AND score >= 70 AND dismissed = 0",
+            "SELECT COUNT(DISTINCT repo_id || '|' || title) FROM items WHERE type = 'security' AND score >= 70 AND dismissed = 0",
             [],
             |r| r.get(0),
         )
         .unwrap_or(0);
     let waiting_prs: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM items WHERE type = 'pr' AND dismissed = 0",
+            "SELECT COUNT(DISTINCT repo_id || '|' || title) FROM items WHERE type = 'pr' AND dismissed = 0",
             [],
             |r| r.get(0),
         )
         .unwrap_or(0);
     let first_timers: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM items WHERE is_first_timer = 1 AND dismissed = 0",
+            "SELECT COUNT(DISTINCT repo_id || '|' || title) FROM items WHERE is_first_timer = 1 AND dismissed = 0",
             [],
             |r| r.get(0),
         )
         .unwrap_or(0);
     let security_alerts: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM items WHERE dismissed = 0 AND (type = 'security' OR tags LIKE '%\"CVE\"%')",
+            "SELECT COUNT(DISTINCT repo_id || '|' || title) FROM items WHERE dismissed = 0 AND (type = 'security' OR tags LIKE '%\"CVE\"%')",
             [],
             |r| r.get(0),
         )
         .unwrap_or(0);
     let ci_failures: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM items WHERE dismissed = 0 AND (tags LIKE '%\"CI\"%' OR tags LIKE '%\"CI-FAILURE\"%')",
+            "SELECT COUNT(DISTINCT repo_id || '|' || title) FROM items WHERE dismissed = 0 AND (tags LIKE '%\"CI\"%' OR tags LIKE '%\"CI-FAILURE\"%')",
             [],
             |r| r.get(0),
         )
         .unwrap_or(0);
     let stale_items: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM items WHERE dismissed = 0 AND (tags LIKE '%\"STALE\"%' OR (priority = 'later' AND type = 'pr'))",
+            "SELECT COUNT(DISTINCT repo_id || '|' || title) FROM items WHERE dismissed = 0 AND (tags LIKE '%\"STALE\"%' OR (priority = 'later' AND type = 'pr'))",
             [],
             |r| r.get(0),
         )
         .unwrap_or(0);
     let bot_activity: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM items WHERE dismissed = 0 AND (is_bot = 1 OR tags LIKE '%\"BOT\"%')",
+            "SELECT COUNT(DISTINCT repo_id || '|' || title) FROM items WHERE dismissed = 0 AND (is_bot = 1 OR tags LIKE '%\"BOT\"%')",
             [],
             |r| r.get(0),
         )
         .unwrap_or(0);
     let slop_items: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM items WHERE dismissed = 0 AND (is_slop = 1 OR tags LIKE '%\"AI-SLOP\"%')",
+            "SELECT COUNT(DISTINCT repo_id || '|' || title) FROM items WHERE dismissed = 0 AND (is_slop = 1 OR tags LIKE '%\"AI-SLOP\"%')",
             [],
             |r| r.get(0),
         )
         .unwrap_or(0);
     let conflicted_prs: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM items WHERE dismissed = 0 AND tags LIKE '%\"CONFLICT\"%'",
+            "SELECT COUNT(DISTINCT repo_id || '|' || title) FROM items WHERE dismissed = 0 AND tags LIKE '%\"CONFLICT\"%'",
             [],
             |r| r.get(0),
         )
