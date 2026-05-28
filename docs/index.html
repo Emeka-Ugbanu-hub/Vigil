@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vigil — A calm menu bar app for GitHub maintainers</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: #000000;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 520px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .hero-svg {
+      width: 48px;
+      height: 48px;
+      opacity: 0.9;
+    }
+    .hero h1 {
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+    .hero p {
+      font-size: 15px;
+      color: rgba(255,255,255,0.5);
+      line-height: 1.4;
+      font-weight: 700;
+      max-width: 380px;
+    }
+
+    /* Glass panel */
+    .panel {
+      background: #111111;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-top: 1px solid rgba(255,255,255,0.18);
+      padding: 20px 24px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 20px rgba(0,0,0,0.5);
+    }
+
+    /* Features list */
+    .features {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .features h2 {
+      font-size: 11px;
+      font-weight: 900;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+    .feature {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-size: 13px;
+    }
+    .feature:last-child { border-bottom: none; }
+    .feature-name { color: rgba(255,255,255,0.7); font-weight: 700; }
+    .feature-tag { color: rgba(255,255,255,0.3); font-size: 10px; font-weight: 800; }
+
+    /* Download buttons */
+    .downloads {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .downloads h2 {
+      font-size: 11px;
+      font-weight: 900;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+    }
+    .dl-row {
+      display: flex;
+      gap: 8px;
+    }
+    .dl-btn {
+      flex: 1;
+      padding: 14px 12px;
+      background: #1a1a1a;
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #fff;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 6px rgba(0,0,0,0.4);
+      transition: all 0.15s;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .dl-btn:hover {
+      background: #222;
+      border-color: rgba(255,255,255,0.25);
+    }
+    .dl-btn .os { font-size: 13px; }
+    .dl-btn .ext { font-size: 9px; color: rgba(255,255,255,0.35); font-weight: 700; }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      font-size: 10px;
+      color: rgba(255,255,255,0.2);
+      font-weight: 700;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .footer a {
+      color: rgba(255,255,255,0.35);
+      text-decoration: none;
+    }
+    .footer a:hover { color: rgba(255,255,255,0.6); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Hero -->
+    <div class="hero">
+      <svg class="hero-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+        <circle cx="256" cy="256" r="240" fill="#000000"/>
+        <g fill="#FFFFFF">
+          <rect x="120" y="128" width="52" height="52"/>
+          <rect x="152" y="184" width="52" height="52"/>
+          <rect x="184" y="240" width="52" height="52"/>
+          <rect x="216" y="296" width="52" height="52"/>
+          <rect x="340" y="128" width="52" height="52"/>
+          <rect x="308" y="184" width="52" height="52"/>
+          <rect x="276" y="240" width="52" height="52"/>
+          <rect x="244" y="296" width="52" height="52"/>
+          <rect x="230" y="352" width="52" height="52"/>
+        </g>
+      </svg>
+      <h1>Vigil</h1>
+      <p>A calm, local-first menu bar app that surfaces prioritized GitHub notifications for maintainers.</p>
+    </div>
+
+    <!-- Downloads -->
+    <div class="panel">
+      <div class="downloads">
+        <h2>DOWNLOAD</h2>
+        <div class="dl-row">
+          <a href="https://github.com/Emeka-Ugbanu-hub/vigil/releases" class="dl-btn" id="dl-mac">
+            <span class="os">macOS</span>
+            <span class="ext">.dmg</span>
+          </a>
+          <a href="https://github.com/Emeka-Ugbanu-hub/vigil/releases" class="dl-btn" id="dl-win">
+            <span class="os">Windows</span>
+            <span class="ext">.msi</span>
+          </a>
+          <a href="https://github.com/Emeka-Ugbanu-hub/vigil/releases" class="dl-btn" id="dl-linux">
+            <span class="os">Linux</span>
+            <span class="ext">.deb</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Features -->
+    <div class="panel">
+      <div class="features">
+        <h2>WHAT IT WATCHES</h2>
+        <div class="feature"><span class="feature-name">Security advisories (CVEs)</span><span class="feature-tag">urgent</span></div>
+        <div class="feature"><span class="feature-name">CI workflow failures</span><span class="feature-tag">streak-aware</span></div>
+        <div class="feature"><span class="feature-name">PR reviews &amp; merge conflicts</span><span class="feature-tag">changes requested</span></div>
+        <div class="feature"><span class="feature-name">Author bumps &amp; heating up</span><span class="feature-tag">engagement</span></div>
+        <div class="feature"><span class="feature-name">Dependabot &amp; bot filtering</span><span class="feature-tag">noise reduction</span></div>
+        <div class="feature"><span class="feature-name">Secret leaks &amp; force pushes</span><span class="feature-tag">critical</span></div>
+        <div class="feature"><span class="feature-name">Releases &amp; discussions</span><span class="feature-tag">activity</span></div>
+      </div>
+    </div>
+
+    <!-- How it works -->
+    <div class="panel">
+      <div class="features">
+        <h2>HOW IT WORKS</h2>
+        <div class="feature"><span class="feature-name">1. Connect GitHub</span><span class="feature-tag">one-time setup</span></div>
+        <div class="feature"><span class="feature-name">2. Pick up to 4 repos</span><span class="feature-tag">you choose</span></div>
+        <div class="feature"><span class="feature-name">3. Menu bar watches in background</span><span class="feature-tag">always-on</span></div>
+        <div class="feature"><span class="feature-name">4. Tap for dashboard</span><span class="feature-tag">instantly</span></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>Local-first · No telemetry · MIT License · <a href="https://github.com/Emeka-Ugbanu-hub/vigil">GitHub</a></p>
+      <p>Built with Tauri 2 + Rust · macOS · Windows · Linux</p>
+    </div>
+  </div>
+</body>
+</html>

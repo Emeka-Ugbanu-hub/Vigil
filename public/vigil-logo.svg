@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="24" height="24">
+  <circle cx="256" cy="256" r="240" fill="#000000" />
+  <g fill="#FFFFFF">
+    <!-- Left arm (bigger blocks, descending right) -->
+    <rect x="120" y="128" width="52" height="52" />
+    <rect x="152" y="184" width="52" height="52" />
+    <rect x="184" y="240" width="52" height="52" />
+    <rect x="216" y="296" width="52" height="52" />
+
+    <!-- Right arm (bigger blocks, descending left) -->
+    <rect x="340" y="128" width="52" height="52" />
+    <rect x="308" y="184" width="52" height="52" />
+    <rect x="276" y="240" width="52" height="52" />
+    <rect x="244" y="296" width="52" height="52" />
+
+    <!-- Bottom point -->
+    <rect x="230" y="352" width="52" height="52" />
+  </g>
+</svg>
