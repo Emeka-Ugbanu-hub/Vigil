@@ -40,6 +40,7 @@ export const PopoverSummary: React.FC<Props> = ({ onOpenInbox, onOpenInboxTab, o
   const repos = s?.repos_count || 0;
   const urgent = s?.urgent_count || 0;
   const today = s?.today_count || 0;
+  const later = s?.later_count || 0;
   const noise = s?.noise_count || 0;
   const [syncing, setSyncing] = useState(false);
 
@@ -55,6 +56,7 @@ export const PopoverSummary: React.FC<Props> = ({ onOpenInbox, onOpenInboxTab, o
     const groups: { count: number; label: string; color: string; tab: string }[] = [];
     if (urgent > 0) groups.push({ count: urgent, label: 'urgent', color: ui.red, tab: 'urgent' });
     if (today > 0) groups.push({ count: today, label: 'pending', color: ui.yellow, tab: 'pending' });
+    if (later > 0) groups.push({ count: later, label: 'later', color: ui.textMuted, tab: 'later' });
     if (noise > 0) groups.push({ count: noise, label: 'noise', color: ui.textFaint, tab: 'noise' });
 
     const segments: React.ReactNode[] = [greeting, <span style={{ color: ui.text }}> — you have </span>];
