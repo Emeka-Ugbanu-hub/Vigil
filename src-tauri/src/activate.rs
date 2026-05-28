@@ -50,33 +50,6 @@ pub fn install_outside_click_monitor<R: tauri::Runtime>(app: &tauri::AppHandle<R
     }
 }
 
-pub fn configure_overlay_window(ns_window_ptr: *mut std::ffi::c_void) {
-    #[cfg(target_os = "macos")]
-    unsafe {
-        let ns_window = ns_window_ptr as *mut objc2::runtime::NSObject;
-
-        // Use NSPanel with utility style — floats above regular windows
-        let mut style_mask: usize = objc2::msg_send![ns_window, styleMask];
-        let utility_window = 1usize << 4;
-        style_mask |= utility_window;
-        let _: () = objc2::msg_send![ns_window, setStyleMask: style_mask];
-
-        // NSStatusWindowLevel (25) — above everything
-        let _: () = objc2::msg_send![ns_window, setLevel: 25i64];
-        let _: () = objc2::msg_send![ns_window, setHidesOnDeactivate: false];
-        let _: () = objc2::msg_send![ns_window, setCanHide: false];
-        // Only drag via data-tauri-drag-region, not the entire window
-
-        // Stay on the current space — no can_join_all_spaces, no move_to_active_space
-        let mut behavior: usize = objc2::msg_send![ns_window, collectionBehavior];
-        let transient = 1usize << 3;
-        let fullscreen_auxiliary = 1usize << 8;
-        let can_join_all_spaces = 1usize << 0;
-        let move_to_active_space = 1usize << 1;
-        behavior &= !(can_join_all_spaces | move_to_active_space);
-        behavior |= transient | fullscreen_auxiliary;
-        let _: () = objc2::msg_send![ns_window, setCollectionBehavior: behavior];
-
-        let _: () = objc2::msg_send![ns_window, orderFrontRegardless];
-    }
+pub fn configure_overlay_window(_ns_window_ptr: *mut std::ffi::c_void) {
+    // Popover uses always_on_top from tauri.conf.json — no custom NSWindow config needed on macOS 15+
 }
