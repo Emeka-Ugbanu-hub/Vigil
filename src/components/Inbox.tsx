@@ -67,7 +67,7 @@ export const Inbox: React.FC<Props> = ({ onBack, onOpenSettings, onOpenDetail, i
     <div style={{ ...shellStyle(300, 540), height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ ...panelStyle(true), flex: '0 0 auto', paddingBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 2 }}>
-          <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.65)', fontSize: 12, fontWeight: 800, padding: '4px 0' }}>←</button>
+          <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: ui.textMuted, fontSize: 14, fontWeight: 800, padding: '4px 4px' }}>←</button>
           <HeaderTitle>Inbox</HeaderTitle>
           <IconButton onClick={onOpenSettings} label="Settings" size={34}>⚙</IconButton>
         </div>

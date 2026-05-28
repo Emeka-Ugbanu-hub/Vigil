@@ -47,22 +47,23 @@ export const PopoverSummary: React.FC<Props> = ({ onOpenInbox, onOpenInboxTab, o
 
   function buildSentence() {
     const name = username ? `@${username}` : 'maintainer';
-    const greeting = <span style={{ color: ui.text }}>Hey, {name} — </span>;
+    const greeting = <span style={{ color: ui.text }}>Hey, {name}</span>;
 
-    if (total === 0 && repos > 0) return <span>{greeting}<span style={{ color: ui.text }}>you're all clear across {plural(repos, 'repo')}.</span></span>;
-    if (total === 0 && repos === 0) return <span>{greeting}<span style={{ color: ui.textMuted }}>no repos configured yet.</span></span>;
+    if (total === 0 && repos > 0) return <span>{greeting}<span style={{ color: ui.textMuted }}> — you're all clear across {plural(repos, 'repo')}.</span></span>;
+    if (total === 0 && repos === 0) return <span>{greeting}<span style={{ color: ui.textMuted }}> — no repos configured yet.</span></span>;
 
-    const segments: React.ReactNode[] = [greeting, <span style={{ color: ui.text }}>you have </span>];
     const groups: { count: number; label: string; color: string; tab: string }[] = [];
     if (urgent > 0) groups.push({ count: urgent, label: 'urgent', color: ui.red, tab: 'urgent' });
     if (today > 0) groups.push({ count: today, label: 'pending', color: ui.yellow, tab: 'pending' });
     if (noise > 0) groups.push({ count: noise, label: 'noise', color: ui.textFaint, tab: 'noise' });
 
-    if (groups.length === 0) return <span>{greeting}<span style={{ color: ui.text }}>you're all clear across {plural(repos, 'repo')}.</span></span>;
+    const segments: React.ReactNode[] = [greeting, <span style={{ color: ui.text }}> — you have </span>];
+
+    if (groups.length === 0) return <span>{greeting}<span style={{ color: ui.textMuted }}> — you're all clear across {plural(repos, 'repo')}.</span></span>;
 
     for (let i = 0; i < groups.length; i++) {
       const g = groups[i];
-      if (i > 0) segments.push(<span style={{ color: ui.text }}>{i === groups.length - 1 ? ', and ' : ', '}</span>);
+      if (i > 0) segments.push(<span style={{ color: ui.text }} key={`sep-${i}`}>{i === groups.length - 1 ? ', and ' : ', '}</span>);
       segments.push(
         <span
           key={g.tab}
@@ -73,7 +74,8 @@ export const PopoverSummary: React.FC<Props> = ({ onOpenInbox, onOpenInboxTab, o
         </span>
       );
     }
-    segments.push(<span style={{ color: ui.text }}>.</span>);
+    segments.push(<span style={{ color: ui.text }}>. </span>);
+    segments.push(<span style={{ color: ui.textMuted }}>across {plural(repos, 'repo')}.</span>);
     return <>{segments}</>;
   }
 
@@ -126,32 +128,25 @@ export const PopoverSummary: React.FC<Props> = ({ onOpenInbox, onOpenInboxTab, o
       {/* Body */}
       <div style={{
         flex: 1,
-        padding: '4px 18px 14px',
+        padding: '18px 20px 14px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
         position: 'relative',
         zIndex: 2,
       }}>
-        <div>
-          {/* Status sentence */}
-          <div style={{ fontSize: 16, fontWeight: 800, color: ui.text, lineHeight: 1.35, marginBottom: 14 }}>
+        {/* Centered sentence */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: ui.text, lineHeight: 1.4 }}>
             {statusSentence}
           </div>
-
-          {/* Repo count */}
-          {repos > 0 && (
-            <div style={{ fontSize: 13, fontWeight: 700, color: ui.textMuted, lineHeight: 1.3 }}>
-              across {plural(repos, 'repo')}{total > 0 ? '.' : ''}
-            </div>
-          )}
         </div>
 
         {/* Footer */}
         <div>
           <div style={{
             borderTop: `1px dashed ${ui.border}`,
-            margin: '8px 0 10px',
+            margin: '8px 0 12px',
           }} />
 
           <div style={{
@@ -164,36 +159,42 @@ export const PopoverSummary: React.FC<Props> = ({ onOpenInbox, onOpenInboxTab, o
               color: ui.textFaint,
               fontWeight: 800,
             }}>
-              {repos} repos · synced {s ? 'now' : '...'}
+              synced {s ? 'now' : '...'}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <button
                 onClick={(e) => { e.stopPropagation(); onOpenTips(); }}
                 style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: ui.textFaint, fontSize: 10, fontWeight: 800,
-                  padding: '2px 4px',
+                  padding: '4px 10px',
+                  borderRadius: 0,
+                  border: `1px solid ${ui.borderStrong}`,
+                  background: ui.surfaceElevated,
+                  color: ui.textMuted,
+                  fontSize: 10,
+                  fontWeight: 800,
+                  cursor: 'pointer',
                 }}
-                title="Repo features guide"
+                title="Repo features"
               >
-                ⓘ tips
+                ⓘ Tips
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); checkNow(); }}
                 disabled={syncing}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: syncing ? 'not-allowed' : 'pointer',
+                  padding: '4px 10px',
+                  borderRadius: 0,
+                  border: `1px solid ${ui.borderStrong}`,
+                  background: ui.surfaceElevated,
                   color: ui.textMuted,
-                  fontSize: 12,
+                  fontSize: 14,
                   fontWeight: 800,
-                  padding: '2px 6px',
-                  opacity: syncing ? 0.4 : 0.7,
+                  cursor: syncing ? 'not-allowed' : 'pointer',
+                  opacity: syncing ? 0.4 : 1,
                 }}
-                title="Check now"
+                title="Sync now"
               >
-                {syncing ? '...' : '⟳'}
+                {syncing ? '...' : '↻'}
               </button>
               <div style={{
                 padding: '4px 14px',
@@ -203,7 +204,7 @@ export const PopoverSummary: React.FC<Props> = ({ onOpenInbox, onOpenInboxTab, o
                 fontWeight: 800,
                 color: ui.textMuted,
               }}>
-                {total > 0 ? `Inbox →` : 'Setup'}
+                Inbox →
               </div>
             </div>
           </div>

@@ -43,9 +43,10 @@ export const RepoSetupTips: React.FC<Props> = ({ onClose }) => {
     }).catch(() => {});
   }, []);
 
-  const repo = repos.find(r => r.id === selectedRepo);
+  const repo = repos.find(r => r.id === selectedRepo) || repos[0];
   const parts = repo ? repo.name.split('/') : [];
-  const owner = parts[0] || '';
+  const repoOwner = parts[0] || '';
+  const repoName = parts[1] || '';
   const name = parts[1] || '';
 
   return (
@@ -102,14 +103,14 @@ export const RepoSetupTips: React.FC<Props> = ({ onClose }) => {
               {feature.path}
             </div>
             <button
-              onClick={() => { if (owner && name) openUrl(feature.url(owner, name)); }}
-              disabled={!owner || !name}
+              onClick={() => { if (repo) openUrl(feature.url(repoOwner, repoName)); }}
+              disabled={!repo}
               style={{
                 padding: '4px 12px', borderRadius: 0, fontSize: 10, fontWeight: 800,
                 background: ui.surfaceElevated, color: ui.text,
                 border: `1px solid ${ui.borderStrong}`,
-                cursor: owner ? 'pointer' : 'not-allowed',
-                opacity: owner ? 1 : 0.4,
+                cursor: repo ? 'pointer' : 'not-allowed',
+                opacity: repo ? 1 : 0.4,
               }}
             >
               Open repo settings ↗

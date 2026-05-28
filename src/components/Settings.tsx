@@ -109,9 +109,9 @@ export const Settings: React.FC<Props> = ({ onBack, onManageRepos }) => {
     >
       <div style={{ ...panelStyle(true), flex: '0 0 auto', paddingBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, position: 'relative', zIndex: 2 }}>
-          <IconButton onClick={onBack} label="Back">‹</IconButton>
+          <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: ui.textMuted, fontSize: 14, fontWeight: 800, padding: '4px 4px' }}>←</button>
           <HeaderTitle>Settings</HeaderTitle>
-          <div style={{ width: 42 }} />
+          <div style={{ width: 28 }} />
         </div>
 
         <div style={{ position: 'relative', zIndex: 2 }}>

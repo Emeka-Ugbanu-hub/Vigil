@@ -81,10 +81,8 @@ export const RepoManagement: React.FC<Props> = ({ onBack }) => {
         <div data-tauri-drag-region style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'grab' }}>
           <button
             onClick={onBack}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: ui.textMuted, fontSize: 12, fontWeight: 800, padding: '4px 0' }}
-          >
-            ←
-          </button>
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: ui.textMuted, fontSize: 14, fontWeight: 800, padding: '4px 4px' }}
+          >←</button>
           <HeaderTitle>Repos</HeaderTitle>
           <div style={{ width: 24 }} />
         </div>
